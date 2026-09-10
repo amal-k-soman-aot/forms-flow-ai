@@ -54,7 +54,7 @@ jobs:
     steps:
       - name: Notify Google Chat
         env:
-          GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
+          GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.DOCKER_HUB_DEPLOY_GOOGLE_CHAT_WEBHOOK_URL }}
           STATUS: ${{ inputs.status }}
           COMPONENT: ${{ inputs.component }}
           IMAGE: ${{ inputs.image }}

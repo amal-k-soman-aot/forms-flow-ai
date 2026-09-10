@@ -34,10 +34,10 @@ jobs:
       id-token: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@1e31de5234b9f8995739874a8ce0492dc87873e2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
         with:
           install: true
 
@@ -60,14 +60,14 @@ jobs:
 
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@2af9c6a52b5431eea749f0e923b7503b84813f77
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302
         with:
           images: ${{ matrix.image }}
           tags: ${{ env.VERSION }}
 
       - name: Get Docker token
         id: docker_oidc
-        uses: docker/oidc-action@56744aa47577854fb24ebdf67fce890ee83d9d41
+        uses: docker/oidc-action@2500c95e182cadc20f0ead5f96113ee82c736e88
         with:
           connection-id: ${{ secrets.DOCKER_OIDC_CONNECTION_ID }}
           expires-in: 3600
@@ -77,7 +77,7 @@ jobs:
          username: ${{ secrets.DOCKER_HUB_ORG_USERNAME }}
          password: ${{ steps.docker_oidc.outputs.token }}
       - name: Cache Docker layers
-        uses: actions/cache@13aacd865c20de90d75de3b17ebe84f7a17d57d2
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-buildx-${{ matrix.name }}-${{ github.sha }}
@@ -85,18 +85,18 @@ jobs:
             ${{ runner.os }}-buildx-${{ matrix.name }}
             
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@4926b4b46f331137467a09ecdd2e3761a1e1d1e6
+        uses: docker/setup-qemu-action@1f40c72289eff860ee54a304f1438e3cff362e0a
         with:
           platforms: all
           
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd
+        uses: docker/setup-buildx-action@37fe631027851001ddb9b187196cc803df7f5f0e
         with:
           driver: docker-container
           version: latest
       - name: Build and push Docker image
         if: ${{ github.ref != 'refs/heads/master' }}
-        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
         with:
           context: forms-flow-data-layer
           push: true
@@ -105,7 +105,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
       - name: Build and push Docker image
         if: ${{ github.ref == 'refs/heads/master' }}
-        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
         with:
           context: forms-flow-data-layer
           push: true
@@ -126,7 +126,7 @@ jobs:
         with:
           sarif_file: snyk.sarif
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7
+        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c
         with:
           role-to-assume: arn:aws:iam::653405621825:role/githubaction-formsflow-eks-deploy
           aws-region: ca-central-1
@@ -143,7 +143,7 @@ jobs:
 
       - name: Deploy to eks
         run: |
-          kubectl -n ${{ secrets.DEV_OPENSOURCE_NAMESPACE }} patch deployment forms-flow-data-layer -p '{"spec":{"template":{"spec":{"containers":[{"name":"forms-flow-bpm","image":"docker.io/formsflow/forms-flow-bpm:${{ env.VERSION }}"}]}}}}'
+          kubectl -n ${{ secrets.DEV_OPENSOURCE_NAMESPACE }} patch deployment forms-flow-data-layer -p '{"spec":{"template":{"spec":{"containers":[{"name":"forms-flow-data-layer","image":"docker.io/formsflow/forms-flow-data-layer:${{ env.VERSION }}"}]}}}}'
           kubectl -n ${{ secrets.DEV_OPENSOURCE_NAMESPACE }} rollout restart deployment forms-flow-data-layer
     notify:
       needs: build-and-push-image-to-dockerhub
@@ -158,3 +158,5 @@ jobs:
         actor: ${{ github.actor }}
         workflow: ${{ github.workflow }}
         run_url: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+      secrets:
+        GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.DOCKER_HUB_DEPLOY_GOOGLE_CHAT_WEBHOOK_URL }}
