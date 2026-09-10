@@ -25,23 +25,25 @@ jobs:
             context: forms-flow-documents
             dockerfile: Dockerfile
             name: forms-flow-documents
+    outputs:
+      image: ${{ steps.meta.outputs.tags }}
     permissions:
       contents: read
       packages: write
       security-events: write
-      id-token: true
+      id-token: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@1e31de5234b9f8995739874a8ce0492dc87873e2
       - name: Set up Docker Buildx
         id: buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd
         with:
           driver: docker-container
           install: true
           
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@4926b4b46f331137467a09ecdd2e3761a1e1d1e6
         with:
           platforms: all
 
@@ -64,24 +66,24 @@ jobs:
 
       - name: Docker meta
         id: meta
-        uses: docker/metadata-action@v3
+        uses: docker/metadata-action@2af9c6a52b5431eea749f0e923b7503b84813f77
         with:
           images: ${{ matrix.image }}
           tags: ${{ env.VERSION }}
 
       - name: Get Docker token
         id: docker_oidc
-        uses: docker/oidc-action@v1
+        uses: docker/oidc-action@56744aa47577854fb24ebdf67fce890ee83d9d41
         with:
           connection-id: ${{ secrets.DOCKER_OIDC_CONNECTION_ID }}
           expires-in: 3600
       - name: Docker login
-        uses: docker/login-action@v4
+        uses: docker/login-action@b45d80f862d83dbcd57f89517bcf500b2ab88fb2
         with:
-         username: ${{ secrets.DOCKER_HUB_USERNAME }}
+         username: ${{ secrets.DOCKER_HUB_ORG_USERNAME }}
          password: ${{ steps.docker_oidc.outputs.token }}
       - name: Cache Docker layers
-        uses: actions/cache@v4
+        uses: actions/cache@13aacd865c20de90d75de3b17ebe84f7a17d57d2
         with:
           path: /tmp/.buildx-cache
           key: ${{ runner.os }}-buildx-${{ matrix.name }}-${{ github.sha }}
@@ -90,7 +92,7 @@ jobs:
       
       - name: Build and push Docker image
         if: ${{ github.ref != 'refs/heads/master' }}
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294
         with:
           context: forms-flow-documents
           push: true
@@ -99,7 +101,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
       - name: Build and push Docker image
         if: ${{ github.ref == 'refs/heads/master' }}
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294
         with:
           context: forms-flow-documents
           push: true
@@ -107,7 +109,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}, formsflow/forms-flow-documents-api:latest
           labels: ${{ steps.meta.outputs.labels }}
       - name: Build and push Docker image - arm64
-        uses: docker/build-push-action@v7
+        uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294
         with:
           context: forms-flow-documents
           file: forms-flow-documents/Dockerfile-ARM64
@@ -128,13 +130,12 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: snyk.sarif
-#####
-      - name: Set up AWS CLI
-        uses: aws-actions/configure-aws-credentials@v1
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7
         with:
-          aws-access-key-id: ${{ secrets.AWS_DEPLOYMENT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_DEPLOYMENT_SECRET_ACCESS_KEY }}
-          aws-region: ca-central-1  # Change this to your desired region
+          role-to-assume: arn:aws:iam::653405621825:role/githubaction-formsflow-eks-deploy
+          aws-region: ca-central-1
+          role-session-name: github-actions-eks-deploy
       - name: Install kubectl
         run: |
           curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
@@ -146,56 +147,16 @@ jobs:
         run: |
           kubectl -n ${{ secrets.DEV_OPENSOURCE_NAMESPACE }} patch deployment forms-flow-documents-api -p '{"spec":{"template":{"spec":{"containers":[{"name":"forms-flow-documents-api","image":"docker.io/formsflow/forms-flow-documents-api:${{ env.VERSION }}"}]}}}}'
           kubectl -n ${{ secrets.DEV_OPENSOURCE_NAMESPACE }} rollout restart deployment forms-flow-documents-api
-      - name: Notify Google Chat - Success
-        if: ${{ success() }}
-        env:
-          GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.DOCKER_HUB_DEPLOY_GOOGLE_CHAT_WEBHOOK_URL }}
-          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
-        run: |
-          curl --fail-with-body -X POST \
-            -H "Content-Type: application/json; charset=UTF-8" \
-            -d "$(jq -n \
-              --arg repository "${{ github.repository }}" \
-              --arg branch "${{ github.ref_name }}" \
-              --arg tags "$IMAGE_TAGS" \
-              --arg actor "${{ github.actor }}" \
-              --arg sha "${{ github.sha }}" \
-              --arg workflow "${{ github.workflow }}" \
-              --arg run_url "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-              '{
-                text: (
-                  "🐳 *Docker Image Released Successfully* 🚀\n\n" +
-                  "*Repository:* " + $repository + "\n" +
-                  "*Branch:* " + $branch + "\n" +
-                  "*Image:* " + $tags + "\n" +
-                  "*Commit:* " + $sha + "\n" +
-                  "*Triggered by:* " + $actor + "\n\n" +
-                  "🔗 " + $run_url
-                )
-              }')" \
-            "$GOOGLE_CHAT_WEBHOOK_URL"
-
-      - name: Notify Google Chat - Failure
-        if: ${{ failure() }}
-        env:
-          GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.DOCKER_HUB_DEPLOY_GOOGLE_CHAT_WEBHOOK_URL }}
-        run: |
-          curl --fail-with-body -X POST \
-            -H "Content-Type: application/json; charset=UTF-8" \
-            -d "$(jq -n \
-              --arg repository "${{ github.repository }}" \
-              --arg branch "${{ github.ref_name }}" \
-              --arg actor "${{ github.actor }}" \
-              --arg workflow "${{ github.workflow }}" \
-              --arg run_url "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}" \
-              '{
-                text: (
-                  "❌ *Docker Image Release Failed*\n\n" +
-                  "*Repository:* " + $repository + "\n" +
-                  "*Branch:* " + $branch + "\n" +
-                  "*Workflow:* " + $workflow + "\n" +
-                  "*Triggered by:* " + $actor + "\n\n" +
-                  "🔗 Check the workflow:\n" + $run_url
-                )
-              }')" \
-            "$GOOGLE_CHAT_WEBHOOK_URL"  
+    notify:
+      needs: build-and-push-image-to-dockerhub
+      if: always()
+      uses: ./.github/workflows/notify-google-chat.yml
+      with:
+        status: ${{ needs.build-and-push-image-to-dockerhub.result }}
+        component: "forms-flow-documents"
+        image: "${{ needs.build-and-push-image-to-dockerhub.outputs.image }}"
+        branch: ${{ github.ref_name }}
+        commit: ${{ github.sha }}
+        actor: ${{ github.actor }}
+        workflow: ${{ github.workflow }}
+        run_url: "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"

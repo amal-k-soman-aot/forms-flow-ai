@@ -1,0 +1,114 @@
+name: Notify Google Chat
+
+on:
+  workflow_call:
+    inputs:
+      status:
+        description: "Result of the calling workflow/job"
+        required: true
+        type: string
+
+      component:
+        description: "Component name"
+        required: true
+        type: string
+
+      image:
+        description: "Docker image and tag"
+        required: true
+        type: string
+
+      branch:
+        description: "Git branch"
+        required: true
+        type: string
+
+      commit:
+        description: "Git commit SHA"
+        required: true
+        type: string
+
+      actor:
+        description: "GitHub actor"
+        required: true
+        type: string
+
+      workflow:
+        description: "Workflow name"
+        required: true
+        type: string
+
+      run_url:
+        description: "GitHub Actions run URL"
+        required: true
+        type: string
+
+    secrets:
+      GOOGLE_CHAT_WEBHOOK_URL:
+        required: true
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Notify Google Chat
+        env:
+          GOOGLE_CHAT_WEBHOOK_URL: ${{ secrets.GOOGLE_CHAT_WEBHOOK_URL }}
+          STATUS: ${{ inputs.status }}
+          COMPONENT: ${{ inputs.component }}
+          IMAGE: ${{ inputs.image }}
+          BRANCH: ${{ inputs.branch }}
+          COMMIT: ${{ inputs.commit }}
+          ACTOR: ${{ inputs.actor }}
+          WORKFLOW: ${{ inputs.workflow }}
+          RUN_URL: ${{ inputs.run_url }}
+        run: |
+          if [ "$STATUS" = "success" ]; then
+            MESSAGE=$(jq -n \
+              --arg component "$COMPONENT" \
+              --arg image "$IMAGE" \
+              --arg branch "$BRANCH" \
+              --arg commit "$COMMIT" \
+              --arg actor "$ACTOR" \
+              --arg workflow "$WORKFLOW" \
+              --arg run_url "$RUN_URL" \
+              '{
+                text: (
+                  "🐳 *Docker Image Released Successfully* 🚀\n\n" +
+                  "*Component:* " + $component + "\n" +
+                  "*Image:* " + $image + "\n" +
+                  "*Branch:* " + $branch + "\n" +
+                  "*Commit:* " + $commit + "\n" +
+                  "*Triggered by:* " + $actor + "\n" +
+                  "*Workflow:* " + $workflow + "\n\n" +
+                  "🔗 " + $run_url
+                )
+              }')
+          else
+            MESSAGE=$(jq -n \
+              --arg component "$COMPONENT" \
+              --arg image "$IMAGE" \
+              --arg branch "$BRANCH" \
+              --arg commit "$COMMIT" \
+              --arg actor "$ACTOR" \
+              --arg workflow "$WORKFLOW" \
+              --arg run_url "$RUN_URL" \
+              '{
+                text: (
+                  "❌ *Docker Image Release Failed*\n\n" +
+                  "*Component:* " + $component + "\n" +
+                  "*Image:* " + $image + "\n" +
+                  "*Branch:* " + $branch + "\n" +
+                  "*Commit:* " + $commit + "\n" +
+                  "*Triggered by:* " + $actor + "\n" +
+                  "*Workflow:* " + $workflow + "\n\n" +
+                  "🔗 Check the workflow:\n" + $run_url
+                )
+              }')
+          fi
+
+          curl --fail-with-body -X POST \
+            -H "Content-Type: application/json; charset=UTF-8" \
+            -d "$MESSAGE" \
+            "$GOOGLE_CHAT_WEBHOOK_URL"
