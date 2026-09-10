@@ -147,7 +147,7 @@ jobs:
           kubectl -n ${{ secrets.DEV_OPENSOURCE_NAMESPACE }} rollout restart deployment forms-flow-data-layer
   notify:
     needs: build-and-push-image-to-dockerhub
-    if: always()
+    if: always() && github.repository == 'AOT-Technologies/forms-flow-ai'
     uses: ./.github/workflows/notify-google-chat.yml
     with:
       status: ${{ needs.build-and-push-image-to-dockerhub.result }}
