@@ -103,7 +103,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}, formsflow/forms-flow-bpm:latest
           labels: ${{ steps.meta.outputs.labels }}  
       - name: Scan Docker image 🐳
-        uses: snyk/actions/docker@master
+        uses: snyk/actions/docker@12140f4059e244892ae643824a95459a102120dd
         continue-on-error: true
         with:
           image: ${{ steps.meta.outputs.tags }}
@@ -130,7 +130,7 @@ jobs:
             # exit 1
           fi
       - name: Upload Snyk report as sarif 📦
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@ebcb5b36ded6beda4ceefea6a8bc4cc885255bb3 # v3.34.1
         with:
           sarif_file: snyk.sarif
 
