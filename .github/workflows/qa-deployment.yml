@@ -16,10 +16,10 @@ jobs:
     permissions:
       contents: read
       packages: write
-
+      id-token: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2  # Add this step to check out the repository
+        uses: actions/checkout@1e31de5234b9f8995739874a8ce0492dc87873e2
 
       - name: Set version
         if: ${{ github.ref != 'refs/heads/master' }}
@@ -39,11 +39,11 @@ jobs:
       - run: echo ${{ env.VERSION }}
       
       - name: Set up AWS CLI
-        uses: aws-actions/configure-aws-credentials@v1
+        uses: aws-actions/configure-aws-credentials@8df5847569e6427dd6c4fb1cf565c83acfa8afa7
         with:
-          aws-access-key-id: ${{ secrets.AWS_DEPLOYMENT_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_DEPLOYMENT_SECRET_ACCESS_KEY }}
-          aws-region: ca-central-1  # Change this to your desired region
+          role-to-assume: arn:aws:iam::653405621825:role/githubaction-formsflow-eks-deploy
+          aws-region: ca-central-1
+          role-session-name: github-actions-eks-deploy # Change this to your desired region
       - name: Install kubectl
         run: |
           curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
