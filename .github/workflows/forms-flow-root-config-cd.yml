@@ -68,7 +68,7 @@ jobs:
         uses: docker/oidc-action@2500c95e182cadc20f0ead5f96113ee82c736e88
         with:
           connection-id: ${{ secrets.DOCKER_OIDC_CONNECTION_ID }}
-          expires-in: 3600
+          expires-in: 1800
       - name: Docker login
         uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f
         with:
